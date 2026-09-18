@@ -11,7 +11,8 @@ from typing import Any, Dict, Optional
 import requests
 from requests import Response, Session
 
-from .transcript import enrich_payload, last_line
+from .codex_state import is_internal_title_turn, read_thread, read_turn_duration_ms
+from .transcript import enrich_payload, format_duration_ms, last_line
 
 SLACK_API_BASE = "https://slack.com/api"
 DEFAULT_TIMEOUT_SECONDS = 10
@@ -331,6 +332,25 @@ def normalize_payload(payload: Dict[str, Any]) -> Dict[str, Any]:
         if closing:
             normalized["last_result"] = closing
 
+    # The thread name and the turn duration are not in the payload; Codex keeps
+    # both in its own state database.
+    thread = read_thread(str(payload.get("thread-id") or ""))
+    if thread.get("title") and not normalized.get("session_title"):
+        normalized["session_title"] = thread["title"]
+    if thread.get("branch") and not normalized.get("branch"):
+        normalized["branch"] = thread["branch"]
+    if thread.get("cwd") and not normalized.get("cwd") and not normalized.get("repo"):
+        normalized["cwd"] = thread["cwd"]
+
+    if not normalized.get("duration"):
+        duration = format_duration_ms(
+            read_turn_duration_ms(
+                str(payload.get("thread-id") or ""), str(payload.get("turn-id") or "")
+            )
+        )
+        if duration:
+            normalized["duration"] = duration
+
     return normalized
 
 
@@ -523,6 +543,9 @@ def slack_main(argv: Optional[list[str]] = None) -> int:
 
     try:
         payload = load_payload(args.payload, args.payload_file)
+        if is_internal_title_turn(payload):
+            LOG.info("Skipping Codex internal thread-title turn")
+            return 0
         if not args.no_transcript:
             payload = enrich_payload(payload)
         message = build_message(payload, args.title)
@@ -572,6 +595,9 @@ def lark_main(argv: Optional[list[str]] = None) -> int:
 
     try:
         payload = load_payload(args.payload, args.payload_file)
+        if is_internal_title_turn(payload):
+            LOG.info("Skipping Codex internal thread-title turn")
+            return 0
         if not args.no_transcript:
             payload = enrich_payload(payload)
         message = build_message(payload, args.title)

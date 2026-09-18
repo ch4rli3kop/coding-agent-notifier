@@ -156,7 +156,14 @@ notify = ["/path/to/coding-agent-notifier/scripts/notifier/agent_notify_wrapper.
 
 Codex passes its `agent-turn-complete` JSON as the first argument, which the wrapper already
 accepts. Its kebab-case keys (`input-messages`, `last-assistant-message`, `cwd`) are mapped onto
-the fields above, so the request becomes the headline and the reply's closing line follows.
+the fields above. The payload carries neither the thread name nor the turn duration, so both are
+read back from Codex's own SQLite state (`$CODEX_HOME/state_*.sqlite` and
+`thread_history_*.sqlite`). Those are internals rather than a published interface, so a failed
+lookup is ignored and the notification goes out without them.
+
+Codex also runs a turn against itself to name a new thread, which fires `notify` like any other.
+That turn is recognised (by its prompt, or by a reply that is just `{"title": "..."}`) and sends no
+notification.
 
 Payloads without a transcript keep the original flat layout (`Status:` / `Duration:` / `Repo:`
 lines), so custom hooks and CI scripts are unaffected.

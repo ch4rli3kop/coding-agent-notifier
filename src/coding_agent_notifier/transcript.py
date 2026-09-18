@@ -262,10 +262,7 @@ def read_git_branch(repo: str) -> Optional[str]:
     return None
 
 
-def format_duration(start: Optional[datetime], end: Optional[datetime]) -> Optional[str]:
-    if not start or not end:
-        return None
-    total = int((end - start).total_seconds())
+def _format_seconds(total: int) -> Optional[str]:
     if total < 0:
         return None
     if total < 60:
@@ -275,6 +272,18 @@ def format_duration(start: Optional[datetime], end: Optional[datetime]) -> Optio
         return f"{minutes}m {seconds:02d}s"
     hours, minutes = divmod(minutes, 60)
     return f"{hours}h {minutes:02d}m"
+
+
+def format_duration(start: Optional[datetime], end: Optional[datetime]) -> Optional[str]:
+    if not start or not end:
+        return None
+    return _format_seconds(int((end - start).total_seconds()))
+
+
+def format_duration_ms(milliseconds: Optional[int]) -> Optional[str]:
+    if not isinstance(milliseconds, int) or milliseconds < 0:
+        return None
+    return _format_seconds(round(milliseconds / 1000))
 
 
 def enrich_payload(payload: Dict[str, Any]) -> Dict[str, Any]:
