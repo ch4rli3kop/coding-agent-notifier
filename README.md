@@ -120,7 +120,7 @@ Slack DMs and Feishu/Lark messages are rendered from the hook payload. When the 
 agent has already written and builds a three-line message -- no summarisation call is involved:
 
 ```
-🦊  *Session title*
+🫐  *Session title*
 `repo-name` · branch · 2m 45s · Claude Code
 💬 the last request you made, clipped to 100 characters
 ↳ the closing line of the agent's final reply
@@ -137,8 +137,10 @@ agent has already written and builds a three-line message -- no summarisation ca
 - **Branch** is read straight from `.git/HEAD`; no subprocess is spawned.
 - **The leading emoji identifies the session**, not its outcome: it is derived from the session or
   thread id, so one session keeps its icon for life while several running at once stay apart at a
-  glance. A payload may override it with an `icon` field. With no session id it falls back to the
-  workspace path, so at least each repository is recognisable.
+  glance. The pool holds 120 colour-sorted emoji, picked by rendezvous hashing so that growing it
+  later leaves almost every session on the icon it already had. A payload may override it with an
+  `icon` field. With no session id it falls back to the workspace path, so at least each repository
+  is recognisable.
 - A `status` that reports a failure or a warning prefixes the session icon (`❌ 🦊`). A successful
   status adds nothing, since it is the normal case and the icon slot is worth more as identity.
 - Transcripts of long sessions can exceed 100MB, so only the last 4MB is parsed. A 114MB Codex

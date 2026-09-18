@@ -1,86 +1,175 @@
 """Give every session a stable icon of its own.
 
-When several agent sessions run at once, the leading emoji is what the eye
-lands on first in a Slack list, so it is worth more as an identity than as a
-status flag -- especially since Claude Code and Codex hooks report no status at
-all. The icon is derived from the session id, so the same session keeps the same
-icon for its whole life and across machines.
+When several agent sessions run at once, the leading emoji is what the eye lands
+on first in a Slack list, so it is worth more as an identity than as a status
+flag -- especially since Claude Code and Codex hooks report no status at all.
+
+The icon is derived from the session id, so the same session keeps the same icon
+for its whole life and across machines. Selection uses rendezvous hashing rather
+than `hash % len(pool)`: with the modulo, growing the pool would re-assign every
+session's icon, whereas here a session only moves if a newly added icon happens
+to outscore its current one.
 """
 
 import hashlib
 from typing import Any, Dict, Optional
 
-# Visually distinct emoji that render consistently and need no variation
-# selector. Order is part of the mapping: inserting into the middle would
-# re-assign icons to existing sessions, so new entries go at the end.
+# Grouped by dominant colour so the pool stays visually varied and easy to
+# extend. Entries must render in colour without a variation selector -- see
+# tests/notifier/test_icons.py, which rejects text-default code points.
 SESSION_ICONS = (
-    "\U0001f98a",  # fox
-    "\U0001f43c",  # panda
-    "\U0001f428",  # koala
-    "\U0001f42f",  # tiger
-    "\U0001f981",  # lion
-    "\U0001f438",  # frog
-    "\U0001f419",  # octopus
-    "\U0001f98b",  # butterfly
-    "\U0001f422",  # turtle
-    "\U0001f989",  # owl
-    "\U0001f41d",  # bee
-    "\U0001f42c",  # dolphin
-    "\U0001f9a9",  # flamingo
-    "\U0001f99c",  # parrot
-    "\U0001f433",  # whale
-    "\U0001f988",  # shark
-    "\U0001f40a",  # crocodile
-    "\U0001f996",  # t-rex
-    "\U0001f427",  # penguin
-    "\U0001f430",  # rabbit
-    "\U0001f34e",  # apple
-    "\U0001f34a",  # tangerine
-    "\U0001f34b",  # lemon
-    "\U0001f347",  # grapes
-    "\U0001f353",  # strawberry
-    "\U0001f351",  # peach
-    "\U0001f34d",  # pineapple
-    "\U0001f95d",  # kiwi
-    "\U0001f951",  # avocado
-    "\U0001f33d",  # corn
-    "\U0001f344",  # mushroom
-    "\U0001f335",  # cactus
-    "\U0001f33b",  # sunflower
-    "\U0001f341",  # maple leaf
-    "\U0001f30a",  # wave
-    "\U0001f525",  # fire
-    "\U0001f308",  # rainbow
-    "\U0001f319",  # crescent moon
-    "\U0001f388",  # balloon
-    "\U0001f3a8",  # artist palette
-    "\U0001f3b8",  # guitar
-    "\U0001f3ba",  # trumpet
-    "\U0001f680",  # rocket
-    "\U0001f6f8",  # flying saucer
-    "\U0001f9ed",  # compass
-    "\U0001f52e",  # crystal ball
-    "\U0001f48e",  # gem
-    "\U0001f9e9",  # puzzle piece
-    "\U0001f3b2",  # game die
-    "\U0001fa81",  # kite
-    "\U0001f6f9",  # skateboard
-    "\U0001f3c0",  # basketball
-    "\U0001f3af",  # bullseye
-    "\U0001f3aa",  # circus tent
-    "\U0001f9ff",  # nazar amulet
-    "\U0001f9ca",  # ice cube
+    # red
+    "🍎",
+    "🍒",
+    "🌹",
+    "🎈",
+    "🧨",
+    "🏮",
+    "🦞",
+    "💥",
+    "🚨",
+    "🥊",
+    # orange
+    "🦊",
+    "🍊",
+    "🎃",
+    "🏀",
+    "🥕",
+    "🔥",
+    "🧡",
+    "🍁",
+    "🍑",
+    "🦁",
+    # yellow
+    "🍋",
+    "🌻",
+    "⭐",
+    "🐤",
+    "🧀",
+    "🍌",
+    "🐝",
+    "⚡",
+    "💛",
+    "🌼",
+    # green
+    "🐸",
+    "🥝",
+    "🌵",
+    "🍀",
+    "🥑",
+    "🐢",
+    "💚",
+    "🥦",
+    "🐉",
+    "🎾",
+    # blue
+    "🐬",
+    "💎",
+    "🧊",
+    "🫐",
+    "🌊",
+    "💙",
+    "🦋",
+    "🐳",
+    "🔵",
+    "🌀",
+    # purple
+    "🍇",
+    "🔮",
+    "🟣",
+    "💜",
+    "🦄",
+    "👾",
+    "🍆",
+    "🎆",
+    "🔯",
+    "🪀",
+    # pink
+    "🌸",
+    "🐷",
+    "🦩",
+    "💗",
+    "🌺",
+    "🎀",
+    "🍬",
+    "🦐",
+    "🧁",
+    "👛",
+    # brown
+    "🐻",
+    "🍩",
+    "🧸",
+    "🦉",
+    "🌰",
+    "🎩",
+    "🪵",
+    "🥔",
+    "🐴",
+    "🏈",
+    # black, white and grey
+    "🐼",
+    "🦢",
+    "🐧",
+    "🎱",
+    "⚪",
+    "⚫",
+    "🦓",
+    "🐺",
+    "🎹",
+    "🖤",
+    # multicoloured
+    "🌈",
+    "🎨",
+    "🦜",
+    "🎪",
+    "🎡",
+    "🎠",
+    "🪁",
+    "🎁",
+    "🍭",
+    "🧩",
+    "🎲",
+    "🎯",
+    "🚀",
+    "🛸",
+    "🪐",
+    "🌙",
+    "🍄",
+    "🐙",
+    "🦖",
+    "🐡",
+    "🦈",
+    "🐨",
+    "🐯",
+    "🐰",
+    "🐹",
+    "🐵",
+    "🦥",
+    "🦔",
+    "🦦",
+    "🦚",
 )
 
 DEFAULT_ICON = "✅"
 
 
 def icon_for(seed: Any) -> Optional[str]:
-    """Pick this seed's icon, stably. Python's hash() is salted, so use SHA-256."""
+    """Pick this seed's icon, stably.
+
+    Rendezvous hashing: score every icon against the seed and take the highest.
+    SHA-256 rather than Python's hash(), which is salted per process.
+    """
     if not isinstance(seed, str) or not seed.strip():
         return None
-    digest = hashlib.sha256(seed.strip().encode("utf-8")).digest()
-    return SESSION_ICONS[int.from_bytes(digest[:8], "big") % len(SESSION_ICONS)]
+
+    seed_bytes = seed.strip().encode("utf-8")
+    best_icon = SESSION_ICONS[0]
+    best_score = b""
+    for icon in SESSION_ICONS:
+        score = hashlib.sha256(seed_bytes + b"\x00" + icon.encode("utf-8")).digest()
+        if score > best_score:
+            best_score, best_icon = score, icon
+    return best_icon
 
 
 def session_icon(payload: Dict[str, Any]) -> str:
