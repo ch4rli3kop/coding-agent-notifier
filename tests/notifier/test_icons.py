@@ -129,3 +129,19 @@ def test_growing_the_pool_keeps_most_sessions_on_their_icon() -> None:
 
     # Only seeds that the new icons outscore should move: roughly 3/123 of them.
     assert kept / len(seeds) > 0.95
+
+
+def test_readme_icon_table_matches_the_pool() -> None:
+    """The README lists every icon; drift there is a documentation bug."""
+    import re
+    from pathlib import Path
+
+    readme = (Path(__file__).resolve().parents[2] / "README.md").read_text(encoding="utf-8")
+    table = re.search(r"\| Colour \| Icons \|\n\|[^\n]*\|\n((?:\|[^\n]*\|\n)+)", readme)
+    assert table is not None, "README has no session icon table"
+
+    listed: list[str] = []
+    for row in table.group(1).strip().splitlines():
+        listed += row.split("|")[2].split()
+
+    assert listed == list(SESSION_ICONS)

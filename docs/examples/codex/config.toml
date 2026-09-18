@@ -1,3 +1,7 @@
+# Codex has no turn-level hook event, so finished turns are reported by the
+# `notify` program rather than by a hook. Keep this above any [table].
+notify = ["/path/to/coding-agent-notifier/scripts/notifier/agent_notify_wrapper.sh"]
+
 model = "<YOUR_CODEX_MODEL_ID>"
 model_reasoning_effort = "high"
 
@@ -12,6 +16,5 @@ SLACK_USER_ID = "U12345678"
 # DEBUG_AGENT_PAYLOAD = "/tmp/agent_payload.json"   # capture payload used
 # ENV_FILE = "/path/to/.env"                        # local env-file fallback
 
-# Put hook commands in ~/.codex/hooks.json; see docs/examples/codex/hooks.json.
-# For deterministic Feishu/Lark hooks, prefer a user-level env file loaded by
-# lark_notify.py with --env-file; see docs/examples/codex/hooks_lark.json.
+# For Feishu/Lark, point notify at lark_notify.py instead; see
+# docs/examples/codex/config_lark.toml.

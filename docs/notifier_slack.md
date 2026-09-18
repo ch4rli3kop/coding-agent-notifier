@@ -52,24 +52,18 @@ Flags:
 - `--title`: Optional override for the message title.
 
 ## Hook integration
-Register the wrapper so your coding agent calls it after tasks finish. Example using Codex:
-```json
-{
-  "hooks": {
-    "Stop": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "/path/to/coding-agent-notifier/scripts/notifier/agent_notify_wrapper.sh"
-          }
-        ]
-      }
-    ]
-  }
-}
+Register the wrapper so your coding agent calls it after tasks finish.
+
+Codex has no turn-level hook event, so a `Stop` entry in `~/.codex/hooks.json` never fires. Finished
+turns are reported by the `notify` program instead:
+
+```toml
+# ~/.codex/config.toml — a top-level key, so keep it above any [table]
+notify = ["/path/to/coding-agent-notifier/scripts/notifier/agent_notify_wrapper.sh"]
 ```
-Save that as `~/.codex/hooks.json`. If Codex says the hook needs review, open `/hooks`, review the command, and enable/trust it.
+
+Claude Code and agents with a completion hook point that hook at the same wrapper; see
+`docs/integrations.md`. Restart the agent after editing its config.
 
 The hook can pipe JSON to stdin, pass a payload file path, or pass inline JSON. The wrapper normalizes those forms before forwarding to `slack_notify.py`; the notifier formats a concise DM (title, status, duration, summary, link when present).
 A concrete example is in `scripts/notifier/agent_notify_example.sh`.

@@ -483,3 +483,58 @@ def test_detect_agent_label_from_claude_transcript() -> None:
         "cwd": "/home/user/demo",
     }
     assert build_message(payload).startswith("Claude Code task completed")
+
+
+def test_positional_json_argument_is_used_as_the_payload(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Codex's `notify` appends the payload as an argument, not on stdin."""
+    monkeypatch.setenv("SLACK_BOT_TOKEN", "test-token")
+    monkeypatch.setenv("SLACK_USER_ID", "U1")
+    sent: list[str] = []
+    monkeypatch.setattr(
+        notifier.SlackNotifier, "send_dm", lambda self, user_id, message: sent.append(message)
+    )
+
+    exit_code = notifier.slack_main(
+        ['{"session_title":"Positional","repo":"/tmp/proj","last_prompt":"do it"}']
+    )
+
+    assert exit_code == 0
+    assert "Positional" in sent[0]
+
+
+def test_positional_path_argument_is_read_as_a_file(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    payload_file = tmp_path / "payload.json"
+    payload_file.write_text('{"session_title":"From file","repo":"/tmp/proj"}', encoding="utf-8")
+    monkeypatch.setenv("SLACK_BOT_TOKEN", "test-token")
+    monkeypatch.setenv("SLACK_USER_ID", "U1")
+    sent: list[str] = []
+    monkeypatch.setattr(
+        notifier.SlackNotifier, "send_dm", lambda self, user_id, message: sent.append(message)
+    )
+
+    exit_code = notifier.slack_main([str(payload_file)])
+
+    assert exit_code == 0
+    assert "From file" in sent[0]
+
+
+def test_explicit_payload_flag_beats_the_positional_argument(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("SLACK_BOT_TOKEN", "test-token")
+    monkeypatch.setenv("SLACK_USER_ID", "U1")
+    sent: list[str] = []
+    monkeypatch.setattr(
+        notifier.SlackNotifier, "send_dm", lambda self, user_id, message: sent.append(message)
+    )
+
+    exit_code = notifier.slack_main(
+        ["--payload", '{"session_title":"Flag"}', '{"session_title":"Positional"}']
+    )
+
+    assert exit_code == 0
+    assert "Flag" in sent[0]

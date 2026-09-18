@@ -1,0 +1,9 @@
+# Feishu/Lark notifications for Codex. The wrapper is Slack-only, so notify
+# calls lark_notify.py directly; Codex appends its JSON payload as the last
+# argument, which the CLI accepts positionally.
+notify = [
+  "/path/to/coding-agent-notifier/.venv/bin/python",
+  "/path/to/coding-agent-notifier/scripts/notifier/lark_notify.py",
+  "--env-file", "/home/you/.codex/coding-agent-notifier.env",
+  "--webhook-url-env", "FEISHU_WEBHOOK_URL",
+]

@@ -367,6 +367,19 @@ def normalize_payload(payload: Dict[str, Any]) -> Dict[str, Any]:
     return normalized
 
 
+def _inline_payload(argument: Optional[str]) -> Optional[str]:
+    """A positional argument that looks like JSON is the payload itself."""
+    if isinstance(argument, str) and argument.lstrip()[:1] in ("{", "["):
+        return argument
+    return None
+
+
+def _payload_file(argument: Optional[str]) -> Optional[str]:
+    if isinstance(argument, str) and argument.strip() and _inline_payload(argument) is None:
+        return argument
+    return None
+
+
 def load_payload(payload_arg: Optional[str], payload_file: Optional[str]) -> Dict[str, Any]:
     """Load JSON payload from CLI args or stdin."""
     raw = None
@@ -422,6 +435,11 @@ def _parse_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
         help="Override title for the Slack message",
     )
     parser.add_argument(
+        "payload_argument",
+        nargs="?",
+        help="JSON payload or path to one, as Codex's `notify` program appends it",
+    )
+    parser.add_argument(
         "--no-transcript",
         action="store_true",
         help="Do not read the agent transcript for a session title, request and duration",
@@ -463,6 +481,11 @@ def _parse_lark_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
     parser.add_argument(
         "--title",
         help="Override title for the Feishu/Lark message",
+    )
+    parser.add_argument(
+        "payload_argument",
+        nargs="?",
+        help="JSON payload or path to one, as Codex's `notify` program appends it",
     )
     parser.add_argument(
         "--no-transcript",
@@ -555,7 +578,10 @@ def slack_main(argv: Optional[list[str]] = None) -> int:
         return 1
 
     try:
-        payload = load_payload(args.payload, args.payload_file)
+        payload = load_payload(
+            args.payload or _inline_payload(args.payload_argument),
+            args.payload_file or _payload_file(args.payload_argument),
+        )
         if is_internal_title_turn(payload):
             LOG.info("Skipping Codex internal thread-title turn")
             return 0
@@ -607,7 +633,10 @@ def lark_main(argv: Optional[list[str]] = None) -> int:
         return 1
 
     try:
-        payload = load_payload(args.payload, args.payload_file)
+        payload = load_payload(
+            args.payload or _inline_payload(args.payload_argument),
+            args.payload_file or _payload_file(args.payload_argument),
+        )
         if is_internal_title_turn(payload):
             LOG.info("Skipping Codex internal thread-title turn")
             return 0

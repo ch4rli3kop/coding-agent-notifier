@@ -82,12 +82,15 @@ edit .env
 The simple setup is not secure secret storage. A secure setup would use an OS keychain, a credential helper, or a tightly permissioned credential file loaded only by the notifier. Those approaches reduce exposure, but they add complexity, so this guide keeps them as an advanced path rather than the default.
 
 ## Wire an agent hook to Slack
-Use the portable wrapper so payloads from stdin, inline JSON, or a file all work:
+Use the portable wrapper so payloads from stdin, inline JSON, or a file all work.
+
+Claude Code (`~/.claude/settings.json`):
 ```json
 {
   "hooks": {
     "Stop": [
       {
+        "matcher": "*",
         "hooks": [
           {
             "type": "command",
@@ -99,7 +102,13 @@ Use the portable wrapper so payloads from stdin, inline JSON, or a file all work
   }
 }
 ```
-Save this Codex example as `~/.codex/hooks.json`. If Codex says hooks need review, open `/hooks`, review the command, and enable/trust it.
+
+Codex has no turn-level hook event -- a `Stop` entry in `~/.codex/hooks.json` is never dispatched, whatever its trust state. Finished turns are reported by the `notify` program:
+```toml
+# ~/.codex/config.toml -- a top-level key, so keep it above any [table]
+notify = ["/path/to/coding-agent-notifier/scripts/notifier/agent_notify_wrapper.sh"]
+```
+Restart the agent after editing its config. `notify` is not subject to hook trust, so there is nothing to approve.
 
 Options:
 - Override env file location for local `.env` fallback: `ENV_FILE=/path/to/.env`.
@@ -119,27 +128,17 @@ FEISHU_WEBHOOK_URL=https://open.feishu.cn/open-apis/bot/v2/hook/your-token-here
 EOF
 ```
 
-Codex hook example (`~/.codex/hooks.json`):
-```json
-{
-  "hooks": {
-    "Stop": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "/path/to/python /path/to/coding-agent-notifier/scripts/notifier/lark_notify.py --env-file /home/you/.codex/coding-agent-notifier.env --webhook-url-env FEISHU_WEBHOOK_URL"
-          }
-        ]
-      }
-    ]
-  }
-}
+Codex `notify` example (`~/.codex/config.toml`). The wrapper is Slack-only, so call `lark_notify.py` directly; Codex appends its JSON payload as the last argument, which the CLI accepts positionally:
+```toml
+notify = [
+  "/path/to/coding-agent-notifier/.venv/bin/python",
+  "/path/to/coding-agent-notifier/scripts/notifier/lark_notify.py",
+  "--env-file", "/home/you/.codex/coding-agent-notifier.env",
+  "--webhook-url-env", "FEISHU_WEBHOOK_URL",
+]
 ```
 
-Replace `/path/to/python` with the Python 3.12+ interpreter where you installed this package, and replace `/home/you/.codex/coding-agent-notifier.env` with your user-level env file. Keeping `LARK_WEBHOOK_URL` or `FEISHU_WEBHOOK_URL` in `~/.codex/config.toml` under `[shell_environment_policy.set]` also works after Codex has loaded that config, but `--env-file` avoids stale-session environment issues. For full setup and troubleshooting, see `docs/notifier_lark.md`.
-
-Codex's older top-level `notify = [...]` path is different from hooks: recent Codex versions append the payload as a command argument. If you use `notify` anyway, direct Feishu/Lark commands must include `--payload`; new installs should prefer `~/.codex/hooks.json`.
+Use the interpreter where you installed this package -- the repo-local `.venv` above, or an absolute path to your own -- and point `--env-file` at your user-level env file. Keeping `LARK_WEBHOOK_URL` or `FEISHU_WEBHOOK_URL` in `~/.codex/config.toml` under `[shell_environment_policy.set]` also works once Codex has loaded that config, but `--env-file` avoids stale-session environment issues. For full setup and troubleshooting, see `docs/notifier_lark.md`.
 
 ## Manual Slack send (smoke test)
 ```bash
@@ -170,7 +169,7 @@ echo '{"status":"success","title":"Test ping","summary":"Hello"}' \
 - Feishu/Lark signing: leave signature verification disabled; this first version does not sign custom bot requests.
 - Codex hook not running: open `/hooks` and verify the hook is enabled/trusted. If you script trust state, query the app-server RPC method `hooks/list` for `currentHash` and trust that exact value.
 - Manual Feishu/Lark test succeeds but Codex hook sends nothing: make the hook command load a user-level env file with `--env-file`, then re-open Codex or re-approve the modified hook from `/hooks`.
-- `unrecognized arguments: {"type":"agent-turn-complete",...}`: a Codex `notify` command is passing inline JSON as argv. Use `~/.codex/hooks.json`, or add `--payload` to the direct Feishu/Lark `notify` command.
+- `unrecognized arguments: {"type":"agent-turn-complete",...}`: an older notifier release could not take the payload Codex appends as an argument. Upgrade; both CLIs now accept it positionally.
 
 ## Development
 - Format/lint: `pre-commit run --all-files` (uses ruff).
@@ -182,8 +181,8 @@ echo '{"status":"success","title":"Test ping","summary":"Hello"}' \
 - `docs/guide.md` – this detailed guide.
 - `docs/notifier_slack.md` – focused setup notes for Slack + coding-agent hooks.
 - `docs/notifier_lark.md` – focused setup notes for Feishu/Lark custom bots.
-- `docs/examples/codex/hooks.json` – Codex Stop hook example for Slack.
-- `docs/examples/codex/hooks_lark.json` – Codex Stop hook example for Feishu/Lark.
+- `docs/examples/codex/config.toml` – Codex `notify` example for Slack.
+- `docs/examples/codex/config_lark.toml` – Codex `notify` example for Feishu/Lark.
 - `scripts/notifier/agent_notify_wrapper.sh` – Slack hook entrypoint for common agent payload styles.
 - `src/coding_agent_notifier/transcript.py` – reads the agent transcript for the session title, last request and turn duration (see "Message format" in `README.md`; disable with `--no-transcript`).
 - `scripts/notifier/slack_notify.py` – CLI entry to the notifier logic.
