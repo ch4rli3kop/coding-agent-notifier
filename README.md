@@ -208,12 +208,14 @@ has no failure hook, and `notify` only ever sends `agent-turn-complete`. It does
 though, so a watcher polls its history database and sends what the agent does not:
 
 ```bash
-cp docs/examples/systemd/coding-agent-notifier-codex-watch.service ~/.config/systemd/user/
-# replace /path/to/coding-agent-notifier inside the file, then
-systemctl --user daemon-reload
-systemctl --user enable --now coding-agent-notifier-codex-watch
-loginctl enable-linger "$USER"   # keep it running while you are logged out
+./scripts/install_codex_watch.sh
 ```
+
+That writes a systemd user unit with the absolute paths filled in, starts it, and enables lingering
+so it survives logout. `--interval SECONDS`, `--include-interrupted` and `--no-linger` adjust it,
+`--dry-run` prints the unit without installing, and `--uninstall` removes it again. Without
+systemd, run `scripts/notifier/codex_watch.py --once` from cron instead;
+`docs/examples/systemd/` holds the unit for installing by hand.
 
 ```
 ❌ 🧁  *리포트탈고*
