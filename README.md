@@ -141,6 +141,23 @@ agent has already written and builds a three-line message -- no summarisation ca
 - Pass `--no-transcript` to disable transcript reading entirely, for example if you would rather
   not have request text leave the machine.
 
+### Codex
+
+Codex has no turn-level hook event: its hook events are `PreToolUse`,
+`PermissionRequest`, `PostToolUse`, `PreCompact`, `PostCompact`, `SessionStart`, `SessionEnd`,
+`SubagentStart`, `SubagentStop`, `UserPromptSubmit` and `Interrupt`. A `Stop` entry in
+`~/.codex/hooks.json` is simply never dispatched, whatever its trust state. Finished turns are
+reported through the `notify` program instead:
+
+```toml
+# ~/.codex/config.toml
+notify = ["/path/to/coding-agent-notifier/scripts/notifier/agent_notify_wrapper.sh"]
+```
+
+Codex passes its `agent-turn-complete` JSON as the first argument, which the wrapper already
+accepts. Its kebab-case keys (`input-messages`, `last-assistant-message`, `cwd`) are mapped onto
+the fields above, so the request becomes the headline and the reply's closing line follows.
+
 Payloads without a transcript keep the original flat layout (`Status:` / `Duration:` / `Repo:`
 lines), so custom hooks and CI scripts are unaffected.
 

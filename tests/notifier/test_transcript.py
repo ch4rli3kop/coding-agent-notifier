@@ -374,3 +374,34 @@ def test_broken_custom_title_sidecar_is_ignored(tmp_path: Path) -> None:
     (sidecar_dir / "custom-title.json").write_text("{not json", encoding="utf-8")
 
     assert read_transcript(str(path))["title"] == "Notifier formatting"
+
+
+def test_codex_notify_payload_is_normalized() -> None:
+    """Codex reports finished turns through `notify`, with kebab-case keys."""
+    from coding_agent_notifier.notifier import normalize_payload
+
+    payload = normalize_payload(
+        {
+            "type": "agent-turn-complete",
+            "thread-id": "t1",
+            "turn-id": "u1",
+            "cwd": "/home/user/proj",
+            "input-messages": ["earlier request", "run the tests"],
+            "last-assistant-message": "Ran them.\n69 tests passed.",
+        }
+    )
+
+    assert payload["last_prompt"] == "run the tests"
+    assert payload["last_result"] == "69 tests passed."
+
+    lines = build_message(payload).splitlines()
+    assert lines[0] == "✅  *run the tests*"
+    assert lines[-1] == "↳ 69 tests passed."
+
+
+def test_normalize_payload_leaves_other_shapes_alone() -> None:
+    from coding_agent_notifier.notifier import normalize_payload
+
+    payload = {"status": "ok", "cwd": "/tmp/x"}
+
+    assert normalize_payload(payload) == payload

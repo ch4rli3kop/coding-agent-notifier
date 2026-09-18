@@ -11,7 +11,7 @@ from typing import Any, Dict, Optional
 import requests
 from requests import Response, Session
 
-from .transcript import enrich_payload
+from .transcript import enrich_payload, last_line
 
 SLACK_API_BASE = "https://slack.com/api"
 DEFAULT_TIMEOUT_SECONDS = 10
@@ -307,6 +307,33 @@ def build_message(payload: Dict[str, Any], default_title: Optional[str] = None) 
     return "\n".join(lines)
 
 
+def normalize_payload(payload: Dict[str, Any]) -> Dict[str, Any]:
+    """Map an agent's own notification shape onto the fields build_message reads.
+
+    Codex has no turn-level hook event; it reports finished turns through the
+    `notify` program in ~/.codex/config.toml, whose JSON argument uses
+    kebab-case keys of its own (`agent-turn-complete`).
+    """
+    if not isinstance(payload, dict) or payload.get("type") != "agent-turn-complete":
+        return payload
+
+    normalized = dict(payload)
+
+    messages = payload.get("input-messages")
+    if isinstance(messages, list) and messages and not normalized.get("last_prompt"):
+        last = messages[-1]
+        if isinstance(last, str) and last.strip():
+            normalized["last_prompt"] = last.strip()
+
+    reply = payload.get("last-assistant-message")
+    if isinstance(reply, str) and not normalized.get("last_result"):
+        closing = last_line(reply)
+        if closing:
+            normalized["last_result"] = closing
+
+    return normalized
+
+
 def load_payload(payload_arg: Optional[str], payload_file: Optional[str]) -> Dict[str, Any]:
     """Load JSON payload from CLI args or stdin."""
     raw = None
@@ -330,7 +357,7 @@ def load_payload(payload_arg: Optional[str], payload_file: Optional[str]) -> Dic
         raise NotificationError(f"Invalid JSON payload: {exc}") from exc
     if not isinstance(payload, dict):
         raise NotificationError("JSON payload must be an object")
-    return payload
+    return normalize_payload(payload)
 
 
 def _parse_args(argv: Optional[list[str]] = None) -> argparse.Namespace:

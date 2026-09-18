@@ -9,4 +9,5 @@ from coding_agent_notifier import (  # noqa: F401
     build_message,
     enrich_payload,
     load_payload,
+    normalize_payload,
 )
