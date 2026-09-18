@@ -17,7 +17,7 @@ This guide walks through setup, configuration, usage, debugging, and development
 
 ## Install
 ```bash
-git clone git@github.com:Wangmerlyn/coding-agent-notifier.git
+git clone git@github.com:ch4rli3kop/coding-agent-notifier.git
 cd coding-agent-notifier
 
 # Recommended: a repo-local .venv, which the hook wrapper finds automatically.

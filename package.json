@@ -28,12 +28,12 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/Wangmerlyn/coding-agent-notifier.git"
+    "url": "git+https://github.com/ch4rli3kop/coding-agent-notifier.git"
   },
   "bugs": {
-    "url": "https://github.com/Wangmerlyn/coding-agent-notifier/issues"
+    "url": "https://github.com/ch4rli3kop/coding-agent-notifier/issues"
   },
-  "homepage": "https://github.com/Wangmerlyn/coding-agent-notifier#readme",
+  "homepage": "https://github.com/ch4rli3kop/coding-agent-notifier#readme",
   "peerDependencies": {
     "@opencode-ai/plugin": ">=0.15.0"
   }
