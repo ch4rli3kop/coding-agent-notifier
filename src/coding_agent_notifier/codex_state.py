@@ -14,6 +14,7 @@ best-effort: any failure returns ``None`` and the notification goes out without
 the extra detail.
 """
 
+import json
 import os
 import re
 import sqlite3
@@ -98,6 +99,66 @@ def read_thread(thread_id: str) -> Dict[str, Any]:
         if isinstance(value, str) and value.strip():
             result[key] = value.strip()
     return result
+
+
+def read_thread_rollout_path(thread_id: str) -> Optional[str]:
+    """The transcript Codex wrote for a thread, so the request can be read back."""
+    if not thread_id:
+        return None
+    db_path = _newest_db(STATE_DB_GLOB)
+    if not db_path:
+        return None
+
+    # Its own query: older schemas may not have the column, and a failure here
+    # must not cost us the thread's name.
+    row = _query(db_path, "select rollout_path from threads where id = ?", (thread_id,))
+    if row is None:
+        return None
+    path = row["rollout_path"]
+    return path if isinstance(path, str) and path.strip() else None
+
+
+def read_failed_turns(since: int, statuses: tuple = ("failed",)) -> list:
+    """Turns that ended badly at or after `since` (unix seconds), oldest first."""
+    db_path = _newest_db(HISTORY_DB_GLOB)
+    if not db_path:
+        return []
+
+    placeholders = ",".join("?" for _ in statuses)
+    sql = (
+        "select thread_id, turn_id, status, completed_at, duration_ms, error_json "
+        f"from thread_turns where status in ({placeholders}) and completed_at >= ? "
+        "order by completed_at asc"
+    )
+    try:
+        connection = sqlite3.connect(
+            f"file:{db_path}?mode=ro", uri=True, timeout=DB_TIMEOUT_SECONDS
+        )
+    except sqlite3.Error:
+        return []
+    try:
+        connection.row_factory = sqlite3.Row
+        return [dict(row) for row in connection.execute(sql, (*statuses, since))]
+    except sqlite3.Error:
+        return []
+    finally:
+        connection.close()
+
+
+def error_message(error_json: Any) -> Optional[str]:
+    """Pull the human-readable part out of a turn's stored error."""
+    if not isinstance(error_json, str) or not error_json.strip():
+        return None
+    try:
+        data = json.loads(error_json)
+    except json.JSONDecodeError:
+        return error_json.strip()
+    if isinstance(data, dict):
+        for key in ("message", "msg", "error", "detail"):
+            value = data.get(key)
+            if isinstance(value, str) and value.strip():
+                return value.strip()
+    return error_json.strip()
 
 
 def read_turn_duration_ms(thread_id: str, turn_id: str) -> Optional[int]:

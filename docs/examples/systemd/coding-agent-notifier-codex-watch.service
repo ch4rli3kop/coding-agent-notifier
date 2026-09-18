@@ -1,0 +1,29 @@
+# Codex has no failure hook, so this watcher polls its history database and
+# notifies about turns that ended in an error.
+#
+# Install:
+#   mkdir -p ~/.config/systemd/user
+#   cp docs/examples/systemd/coding-agent-notifier-codex-watch.service ~/.config/systemd/user/
+#   # replace /path/to/coding-agent-notifier below, then:
+#   systemctl --user daemon-reload
+#   systemctl --user enable --now coding-agent-notifier-codex-watch
+#   loginctl enable-linger "$USER"   # keep it running when you are logged out
+#
+# Logs: journalctl --user -u coding-agent-notifier-codex-watch -f
+
+[Unit]
+Description=Coding Agent Notifier - Codex failed-turn watcher
+After=default.target
+
+[Service]
+Type=simple
+WorkingDirectory=/path/to/coding-agent-notifier
+ExecStart=/path/to/coding-agent-notifier/.venv/bin/python \
+  /path/to/coding-agent-notifier/scripts/notifier/codex_watch.py \
+  --env-file /path/to/coding-agent-notifier/.env \
+  --interval 30
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=default.target

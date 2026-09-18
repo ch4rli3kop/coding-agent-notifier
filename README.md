@@ -15,7 +15,8 @@ already open.
 **Contents** — [What a notification looks like](#what-a-notification-looks-like) ·
 [Install](#install) · [Slack credentials](#slack-credentials) · [Wire up your agent](#wire-up-your-agent)
 · [Message format](#message-format) · [Session icons](#session-icons) ·
-[Feishu/Lark](#feishulark-custom-bot) · [Reference](#reference) · [Troubleshooting](#troubleshooting)
+[Codex failed turns](#codex-failed-turns) · [Feishu/Lark](#feishulark-custom-bot) ·
+[Reference](#reference) · [Troubleshooting](#troubleshooting)
 
 ## What a notification looks like
 
@@ -199,6 +200,46 @@ notify = ["/path/to/coding-agent-notifier/scripts/notifier/agent_notify_wrapper.
 ```
 
 Restart Codex afterwards. `notify` is not subject to hook trust, so there is nothing to approve.
+
+### Codex failed turns
+
+Codex notifies nothing when a turn dies on a usage limit, a rate limit or a safeguard refusal: it
+has no failure hook, and `notify` only ever sends `agent-turn-complete`. It does record the failure
+though, so a watcher polls its history database and sends what the agent does not:
+
+```bash
+cp docs/examples/systemd/coding-agent-notifier-codex-watch.service ~/.config/systemd/user/
+# replace /path/to/coding-agent-notifier inside the file, then
+systemctl --user daemon-reload
+systemctl --user enable --now coding-agent-notifier-codex-watch
+loginctl enable-linger "$USER"   # keep it running while you are logged out
+```
+
+```
+❌ 🧁  *리포트탈고*
+`windows_drivers_repo` · main · 13m 46s · Codex
+💬 어 진행해줘.
+↳ Selected model is at capacity. Please try a different model.
+```
+
+- It reports `failed` turns. Add `--include-interrupted` for turns you stopped yourself; those
+  record no error text, so they arrive as a `⚠️` with the request alone.
+- The first run starts from now rather than replaying every past failure. `--since <unix ts>` walks
+  back deliberately.
+- A retried rate limit records the same failure several times; repeats of one error in a thread are
+  coalesced into one notification for ten minutes.
+- A send that fails is retried on the next poll rather than being dropped.
+- `--once` polls a single time, for a cron job or a systemd timer instead of a service.
+- `--dry-run` prints the messages instead of sending them — the quickest way to see what a watcher
+  would have told you:
+
+  ```bash
+  .venv/bin/python scripts/notifier/codex_watch.py --once --dry-run --since $(( $(date +%s) - 86400 ))
+  ```
+
+State lives in `$XDG_STATE_HOME/coding-agent-notifier/codex-watch.json` (`~/.local/state/…` by
+default), holding the watermark and the turns already reported. Logs go to the journal:
+`journalctl --user -u coding-agent-notifier-codex-watch -f`.
 
 ### OpenCode
 
@@ -384,6 +425,7 @@ necessary, since the mapping does not depend on position.
 | `NOTIFIER_PYTHON` | Interpreter the wrapper should use. See [Interpreter resolution](#interpreter-resolution). |
 | `DEBUG_AGENT_PAYLOAD` | Path to write the payload the wrapper selected, for debugging. |
 | `CODEX_HOME` | Where to find Codex's state databases. Default `~/.codex`. |
+| `XDG_STATE_HOME` | Where the Codex watcher keeps its watermark. Default `~/.local/state`. |
 
 ### CLI flags
 

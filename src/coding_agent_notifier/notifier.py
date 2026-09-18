@@ -218,7 +218,7 @@ def _status_emoji(status: Any) -> Optional[str]:
         return None
     if any(word in lowered for word in ("fail", "error", "abort", "cancel", "denied", "reject")):
         return "\u274c"
-    if any(word in lowered for word in ("warn", "partial", "timeout", "skip")):
+    if any(word in lowered for word in ("warn", "partial", "timeout", "skip", "interrupt")):
         return "\u26a0\ufe0f"
     return None
 
