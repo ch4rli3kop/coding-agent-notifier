@@ -319,6 +319,31 @@ def build_message(payload: Dict[str, Any], default_title: Optional[str] = None) 
     return "\n".join(lines)
 
 
+def _normalize_stop_failure(payload: Dict[str, Any]) -> Dict[str, Any]:
+    """Claude Code's StopFailure hook: a turn that ended in an error.
+
+    It fires where `Stop` does not -- an API error, a usage limit, a safeguard
+    refusal -- and carries the error text as `last_assistant_message`.
+    """
+    normalized = dict(payload)
+    normalized.setdefault("status", "failed")
+
+    error = payload.get("error")
+    details = payload.get("error_details")
+    message = payload.get("last_assistant_message")
+
+    if not normalized.get("last_result"):
+        # `error` is often the literal string "unknown"; the message is the
+        # part a person can act on.
+        for candidate in (message, details, error):
+            closing = last_line(candidate) if isinstance(candidate, str) else None
+            if closing and closing.lower() != "unknown":
+                normalized["last_result"] = closing
+                break
+
+    return normalized
+
+
 def normalize_payload(payload: Dict[str, Any]) -> Dict[str, Any]:
     """Map an agent's own notification shape onto the fields build_message reads.
 
@@ -326,7 +351,13 @@ def normalize_payload(payload: Dict[str, Any]) -> Dict[str, Any]:
     `notify` program in ~/.codex/config.toml, whose JSON argument uses
     kebab-case keys of its own (`agent-turn-complete`).
     """
-    if not isinstance(payload, dict) or payload.get("type") != "agent-turn-complete":
+    if not isinstance(payload, dict):
+        return payload
+
+    if payload.get("hook_event_name") == "StopFailure":
+        return _normalize_stop_failure(payload)
+
+    if payload.get("type") != "agent-turn-complete":
         return payload
 
     normalized = dict(payload)

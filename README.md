@@ -160,13 +160,31 @@ Add a `Stop` hook to `~/.claude/settings.json`:
 }
 ```
 
+Add `StopFailure` the same way to be told when a turn ends in an error -- a usage limit, an API
+error, or a safeguard refusal. `Stop` does not fire in those cases:
+
+```json
+"StopFailure": [
+  {
+    "matcher": "*",
+    "hooks": [
+      {
+        "type": "command",
+        "command": "/path/to/coding-agent-notifier/scripts/notifier/agent_notify_wrapper.sh"
+      }
+    ]
+  }
+]
+```
+
 Restart Claude Code afterwards. `SessionEnd` also works if you would rather be notified once per
 session than once per reply.
 
 ### Codex
 
 Codex has **no turn-level hook event**, so a `Stop` entry in `~/.codex/hooks.json` is never
-dispatched no matter its trust state. Its hook events are `PreToolUse`, `PermissionRequest`,
+dispatched no matter its trust state. It has no failure event either, so unlike Claude Code a Codex
+turn that hits a usage limit or a safeguard refusal sends nothing. Its hook events are `PreToolUse`, `PermissionRequest`,
 `PostToolUse`, `PreCompact`, `PostCompact`, `SessionStart`, `SessionEnd`, `SubagentStart`,
 `SubagentStop`, `UserPromptSubmit` and `Interrupt`.
 
@@ -258,6 +276,12 @@ Other behaviour worth knowing:
   rollout reads in about 20ms.
 - A `status` reporting a failure or warning prefixes the session icon (`❌ 🦊`). A successful status
   adds nothing: it is the normal case, and the icon slot is worth more as identity.
+- **Failed turns notify too, on Claude Code.** Its `Stop` hook does not fire when a turn ends in an
+  error, but an undocumented `StopFailure` hook does, carrying the error as
+  `last_assistant_message`. Register it alongside `Stop` and a usage limit, an API error or a
+  safeguard refusal arrives as `❌` with the error as the closing line. Codex has no equivalent
+  event -- its only notification is `agent-turn-complete` -- so a failed or interrupted Codex turn
+  stays silent.
 - Payloads with no transcript keep the original flat layout (`Status:` / `Duration:` / `Repo:`
   lines), so custom hooks and CI scripts are unaffected.
 - `--no-transcript` turns transcript reading off entirely, for repositories where request text
@@ -377,6 +401,7 @@ Both `scripts/notifier/slack_notify.py` and `scripts/notifier/lark_notify.py` ac
 A custom hook or CI script can supply any of these; each line is omitted when its field is absent:
 
 `title` (or `event`, `task`) · `status` (or `state`) · `summary` (or `message`, `details`) ·
+`error`, `error_details`, `last_assistant_message` (StopFailure) ·
 `duration` (or `elapsed`, `time`) · `url` (or `link`, `target`) · `repo` (or `cwd`, `workspace`) ·
 `icon` · `session_id` · `transcript_path`
 
