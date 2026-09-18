@@ -107,7 +107,7 @@ notify = [
   "--webhook-url-env", "FEISHU_WEBHOOK_URL",
 ]
 ```
-Codex has no turn-level hook event, so a `Stop` entry in `~/.codex/hooks.json` never fires; `notify` reports finished turns instead and is not subject to hook trust. Codex appends its JSON payload as the last argument, which `lark_notify.py` accepts positionally. Restart Codex after editing the config.
+Codex has a `Stop` hook, but `notify` needs no hook-trust step, so it is the simpler wiring for finished turns. Codex appends its JSON payload as the last argument, which `lark_notify.py` accepts positionally. Restart Codex after editing the config.
 See `docs/examples/codex/config_lark.toml` for a copy/paste starter.
 
 If you keep the webhook in Codex config instead of an env file, drop `--env-file` and keep only the explicit env-var name:

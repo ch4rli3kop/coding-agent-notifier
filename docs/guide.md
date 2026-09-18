@@ -103,7 +103,7 @@ Claude Code (`~/.claude/settings.json`):
 }
 ```
 
-Codex has no turn-level hook event -- a `Stop` entry in `~/.codex/hooks.json` is never dispatched, whatever its trust state. Finished turns are reported by the `notify` program:
+Codex has a `Stop` hook in `~/.codex/hooks.json`, but it needs the hook-trust step and does not fire on an interrupted or failed turn. `notify` needs no trust, so it is the simpler wiring for finished turns:
 ```toml
 # ~/.codex/config.toml -- a top-level key, so keep it above any [table]
 notify = ["/path/to/coding-agent-notifier/scripts/notifier/agent_notify_wrapper.sh"]

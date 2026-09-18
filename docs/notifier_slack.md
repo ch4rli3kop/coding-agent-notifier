@@ -54,8 +54,8 @@ Flags:
 ## Hook integration
 Register the wrapper so your coding agent calls it after tasks finish.
 
-Codex has no turn-level hook event, so a `Stop` entry in `~/.codex/hooks.json` never fires. Finished
-turns are reported by the `notify` program instead:
+Codex has a `Stop` hook, but it needs the hook-trust step and does not fire on an interrupted or
+failed turn. `notify` needs no trust, so it is the simpler wiring for finished turns:
 
 ```toml
 # ~/.codex/config.toml — a top-level key, so keep it above any [table]

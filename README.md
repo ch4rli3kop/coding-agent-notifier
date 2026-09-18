@@ -182,13 +182,16 @@ session than once per reply.
 
 ### Codex
 
-Codex has **no turn-level hook event**, so a `Stop` entry in `~/.codex/hooks.json` is never
-dispatched no matter its trust state. It has no failure event either, so unlike Claude Code a Codex
-turn that hits a usage limit or a safeguard refusal sends nothing. Its hook events are `PreToolUse`, `PermissionRequest`,
-`PostToolUse`, `PreCompact`, `PostCompact`, `SessionStart`, `SessionEnd`, `SubagentStart`,
-`SubagentStop`, `UserPromptSubmit` and `Interrupt`.
+Codex's hook events are `PreToolUse`, `PermissionRequest`, `PostToolUse`, `PreCompact`,
+`PostCompact`, `UserPromptSubmit`, `SubagentStart`, `SubagentStop`, `Stop`, `Interrupt`,
+`SessionStart` and `SessionEnd`. `Stop` fires at a natural stopping point only: the documentation
+says it does not run when a turn is interrupted or aborted, and a probe confirmed it stays silent
+when a turn dies on a usage limit. **There is no failure event**, so unlike Claude Code a Codex turn
+that hits a usage limit or a safeguard refusal sends nothing. (`SessionEnd` does fire when the
+process ends, which covers `codex exec` but not a failed turn inside a running session.)
 
-Finished turns are reported by the `notify` program instead:
+Finished turns can be reported by the `Stop` hook, or without the hook-trust step by the `notify`
+program:
 
 ```toml
 # ~/.codex/config.toml — a top-level key, so keep it above any [table]

@@ -40,7 +40,7 @@ Most coding-agent CLIs now expose hooks or plugin points that can run shell comm
   ```bash
   /path/to/coding-agent-notifier/scripts/notifier/lark_notify.py
   ```
-- Codex has no turn-level hook event, so a `Stop` entry in `~/.codex/hooks.json` never fires. Use `notify = ["/path/to/scripts/notifier/agent_notify_wrapper.sh"]` in `~/.codex/config.toml` instead; see "Message format" in `README.md`. Codex hook config for its other events still belongs in `~/.codex/hooks.json`. Keep credentials in `~/.codex/config.toml` under `[shell_environment_policy.set]`, or in a 0600 user-level env file that the hook command loads explicitly.
+- Codex has a `Stop` hook, but it needs the hook-trust step and does not fire on an interrupted or failed turn. `notify = ["/path/to/scripts/notifier/agent_notify_wrapper.sh"]` in `~/.codex/config.toml` needs no trust and is the simpler wiring; see "Message format" in `README.md`. Codex's other hook events still belong in `~/.codex/hooks.json`. Keep credentials in `~/.codex/config.toml` under `[shell_environment_policy.set]`, or in a 0600 user-level env file that the hook command loads explicitly.
 - Optionally capture the payload for debugging:
   ```bash
   DEBUG_AGENT_PAYLOAD=/tmp/agent_payload.json

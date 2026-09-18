@@ -1,5 +1,5 @@
-# Codex has no turn-level hook event, so finished turns are reported by the
-# `notify` program rather than by a hook. Keep this above any [table].
+# Codex's `Stop` hook needs the hook-trust step and skips interrupted or failed
+# turns; `notify` needs no trust. Keep this above any [table].
 notify = ["/path/to/coding-agent-notifier/scripts/notifier/agent_notify_wrapper.sh"]
 
 model = "<YOUR_CODEX_MODEL_ID>"
