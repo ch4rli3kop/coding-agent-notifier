@@ -114,6 +114,36 @@ This project has been renamed from Vibe Coding Slack Notifier to Coding Agent No
    # Lint: ruff check .
    ```
 
+## Message format
+Slack DMs and Feishu/Lark messages are rendered from the hook payload. When the payload carries a
+`transcript_path` (Claude Code and Codex both provide one), the notifier reads the transcript the
+agent has already written and builds a three-line message -- no summarisation call is involved:
+
+```
+✅  *Session title*
+`repo-name` · branch · 2m 45s · Claude Code
+💬 the last request you made, clipped to 100 characters
+↳ the closing line of the agent's final reply
+```
+
+- **The request** is the newest `user` record in the transcript. Claude Code also writes a
+  `last-prompt` record, but it lags the conversation by a turn or two, so it is only a fallback.
+  Tool results, slash-command echoes, injected reminders and subagent turns are filtered out.
+- **The closing line** is the last non-empty line of the agent's final reply.
+- **Session title** is the name you gave the session (Claude Code's `custom-title` record, or the
+  `custom-title.json` sidecar), falling back to its generated `ai-title` record. Codex transcripts have no
+  session name, so the last request is promoted to the headline instead.
+- **Duration** covers the final turn (last request to last reply), not the whole session.
+- **Branch** is read straight from `.git/HEAD`; no subprocess is spawned.
+- The leading emoji reflects `status` when a payload supplies one (success / warning / failure).
+- Transcripts of long sessions can exceed 100MB, so only the last 4MB is parsed. A 114MB Codex
+  rollout is read in about 20ms.
+- Pass `--no-transcript` to disable transcript reading entirely, for example if you would rather
+  not have request text leave the machine.
+
+Payloads without a transcript keep the original flat layout (`Status:` / `Duration:` / `Repo:`
+lines), so custom hooks and CI scripts are unaffected.
+
 ## OpenCode plugin install (official flow)
 If you use OpenCode, this repo now exposes an installable plugin package:
 

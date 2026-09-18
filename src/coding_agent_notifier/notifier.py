@@ -11,6 +11,8 @@ from typing import Any, Dict, Optional
 import requests
 from requests import Response, Session
 
+from .transcript import enrich_payload
+
 SLACK_API_BASE = "https://slack.com/api"
 DEFAULT_TIMEOUT_SECONDS = 10
 
@@ -193,6 +195,78 @@ def _detect_agent_label(payload: Dict[str, Any]) -> str:
     return "Codex"
 
 
+TITLE_MAX_CHARS = 80
+PROMPT_MAX_CHARS = 100
+RESULT_MAX_CHARS = 100
+SUMMARY_MAX_CHARS = 200
+
+
+def _one_line(text: Any, limit: int) -> str:
+    """Collapse whitespace and clip to `limit` characters."""
+    collapsed = " ".join(str(text).split())
+    if len(collapsed) <= limit:
+        return collapsed
+    return collapsed[: limit - 1].rstrip() + "\u2026"
+
+
+def _status_emoji(status: Any) -> str:
+    lowered = str(status or "").lower()
+    if any(word in lowered for word in ("fail", "error", "abort", "cancel", "denied", "reject")):
+        return "\u274c"
+    if any(word in lowered for word in ("warn", "partial", "timeout", "skip")):
+        return "\u26a0\ufe0f"
+    return "\u2705"
+
+
+def _build_rich_message(payload: Dict[str, Any], default_title: Optional[str], agent: str) -> str:
+    """Render the compact three-line format used for agent session transcripts."""
+    last_prompt = payload.get("last_prompt")
+    title = (
+        payload.get("title")
+        or payload.get("event")
+        or payload.get("task")
+        or payload.get("session_title")
+        or default_title
+    )
+    # Codex transcripts carry no session name. Promote the request to the
+    # headline rather than printing a generic line above the agent label.
+    prompt_is_title = False
+    if not title and last_prompt:
+        title = _one_line(last_prompt, TITLE_MAX_CHARS)
+        prompt_is_title = True
+    if not title:
+        title = f"{agent} task completed"
+    repo = payload.get("repo") or payload.get("cwd") or payload.get("workspace")
+    branch = payload.get("branch")
+    duration = payload.get("duration") or payload.get("elapsed") or payload.get("time")
+    summary = payload.get("summary") or payload.get("message") or payload.get("details")
+    url = payload.get("url") or payload.get("link") or payload.get("target")
+
+    lines = [f"{_status_emoji(payload.get('status') or payload.get('state'))}  *{title}*"]
+
+    context = []
+    if repo:
+        context.append(f"`{Path(str(repo)).name or repo}`")
+    if branch:
+        context.append(str(branch))
+    if duration:
+        context.append(str(duration))
+    context.append(agent)
+    lines.append(" \u00b7 ".join(context))
+
+    if last_prompt and not prompt_is_title:
+        lines.append(f"\U0001f4ac {_one_line(last_prompt, PROMPT_MAX_CHARS)}")
+    last_result = payload.get("last_result")
+    if last_result:
+        lines.append(f"\u21b3 {_one_line(last_result, RESULT_MAX_CHARS)}")
+    if summary:
+        lines.append(_one_line(summary, SUMMARY_MAX_CHARS))
+    if url:
+        lines.append(f"\U0001f517 {url}")
+
+    return "\n".join(lines)
+
+
 def build_message(payload: Dict[str, Any], default_title: Optional[str] = None) -> str:
     """Create a concise message from a coding-agent notification payload."""
     status = payload.get("status") or payload.get("state")
@@ -202,6 +276,11 @@ def build_message(payload: Dict[str, Any], default_title: Optional[str] = None) 
     url = payload.get("url") or payload.get("link") or payload.get("target")
     repo = payload.get("repo") or payload.get("cwd") or payload.get("workspace")
     agent = _detect_agent_label(payload)
+
+    # Transcript-derived fields mean we know the session name and/or the request,
+    # which is worth a richer layout than the flat key/value list below.
+    if payload.get("session_title") or payload.get("last_prompt"):
+        return _build_rich_message(payload, default_title, agent)
 
     lines = []
 
@@ -283,6 +362,11 @@ def _parse_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
         help="Override title for the Slack message",
     )
     parser.add_argument(
+        "--no-transcript",
+        action="store_true",
+        help="Do not read the agent transcript for a session title, request and duration",
+    )
+    parser.add_argument(
         "--log-level",
         choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"],
         default="WARNING",
@@ -319,6 +403,11 @@ def _parse_lark_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
     parser.add_argument(
         "--title",
         help="Override title for the Feishu/Lark message",
+    )
+    parser.add_argument(
+        "--no-transcript",
+        action="store_true",
+        help="Do not read the agent transcript for a session title, request and duration",
     )
     parser.add_argument(
         "--log-level",
@@ -407,6 +496,8 @@ def slack_main(argv: Optional[list[str]] = None) -> int:
 
     try:
         payload = load_payload(args.payload, args.payload_file)
+        if not args.no_transcript:
+            payload = enrich_payload(payload)
         message = build_message(payload, args.title)
         notifier = SlackNotifier(token)
         notifier.send_dm(user_id, message)
@@ -454,6 +545,8 @@ def lark_main(argv: Optional[list[str]] = None) -> int:
 
     try:
         payload = load_payload(args.payload, args.payload_file)
+        if not args.no_transcript:
+            payload = enrich_payload(payload)
         message = build_message(payload, args.title)
         notifier = LarkNotifier(webhook_url)
         notifier.send_text(message)

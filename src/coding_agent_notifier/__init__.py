@@ -7,5 +7,6 @@ from .notifier import (  # noqa: F401
     SlackNotificationError,
     SlackNotifier,
     build_message,
+    enrich_payload,
     load_payload,
 )

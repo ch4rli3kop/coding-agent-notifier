@@ -185,6 +185,7 @@ echo '{"status":"success","title":"Test ping","summary":"Hello"}' \
 - `docs/examples/codex/hooks.json` – Codex Stop hook example for Slack.
 - `docs/examples/codex/hooks_lark.json` – Codex Stop hook example for Feishu/Lark.
 - `scripts/notifier/agent_notify_wrapper.sh` – Slack hook entrypoint for common agent payload styles.
+- `src/coding_agent_notifier/transcript.py` – reads the agent transcript for the session title, last request and turn duration (see "Message format" in `README.md`; disable with `--no-transcript`).
 - `scripts/notifier/slack_notify.py` – CLI entry to the notifier logic.
 - `scripts/notifier/lark_notify.py` – CLI entry for Feishu/Lark custom bot webhooks.
 
