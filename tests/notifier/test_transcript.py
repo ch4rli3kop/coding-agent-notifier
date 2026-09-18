@@ -3,6 +3,7 @@
 import json
 from pathlib import Path
 
+from coding_agent_notifier.icons import session_icon
 from coding_agent_notifier.notifier import build_message
 from coding_agent_notifier.transcript import (
     enrich_payload,
@@ -189,7 +190,7 @@ def test_rich_message_layout(tmp_path: Path) -> None:
     )
     lines = build_message(payload).splitlines()
 
-    assert lines[0] == "✅  *Notifier formatting*"
+    assert lines[0] == f"{session_icon(payload)}  *Notifier formatting*"
     assert lines[1] == "`coding-agent-notifier` · main · 2m 45s · Codex"
     assert lines[2] == "\U0001f4ac second request"
     assert lines[3] == "\u21b3 done"
@@ -224,7 +225,7 @@ def test_prompt_becomes_the_headline_without_a_session_title() -> None:
 
     lines = build_message(payload).splitlines()
 
-    assert lines[0] == "✅  *archive the old reports*"
+    assert lines[0] == f"{session_icon(payload)}  *archive the old reports*"
     assert not any(line.startswith("\U0001f4ac") for line in lines)
 
 
@@ -395,7 +396,7 @@ def test_codex_notify_payload_is_normalized() -> None:
     assert payload["last_result"] == "69 tests passed."
 
     lines = build_message(payload).splitlines()
-    assert lines[0] == "✅  *run the tests*"
+    assert lines[0] == f"{session_icon(payload)}  *run the tests*"
     assert lines[-1] == "↳ 69 tests passed."
 
 

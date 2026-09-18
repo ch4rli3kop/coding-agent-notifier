@@ -12,6 +12,7 @@ import requests
 from requests import Response, Session
 
 from .codex_state import is_internal_title_turn, read_thread, read_turn_duration_ms
+from .icons import session_icon
 from .transcript import enrich_payload, format_duration_ms, last_line
 
 SLACK_API_BASE = "https://slack.com/api"
@@ -210,13 +211,23 @@ def _one_line(text: Any, limit: int) -> str:
     return collapsed[: limit - 1].rstrip() + "\u2026"
 
 
-def _status_emoji(status: Any) -> str:
+def _status_emoji(status: Any) -> Optional[str]:
+    """Return an emoji only when the status is worth flagging."""
     lowered = str(status or "").lower()
+    if not lowered:
+        return None
     if any(word in lowered for word in ("fail", "error", "abort", "cancel", "denied", "reject")):
         return "\u274c"
     if any(word in lowered for word in ("warn", "partial", "timeout", "skip")):
         return "\u26a0\ufe0f"
-    return "\u2705"
+    return None
+
+
+def _lead_icons(payload: Dict[str, Any]) -> str:
+    """The session's own icon, prefixed by a status emoji when something failed."""
+    icon = session_icon(payload)
+    status = _status_emoji(payload.get("status") or payload.get("state"))
+    return f"{status} {icon}" if status else icon
 
 
 def _build_rich_message(payload: Dict[str, Any], default_title: Optional[str], agent: str) -> str:
@@ -243,7 +254,7 @@ def _build_rich_message(payload: Dict[str, Any], default_title: Optional[str], a
     summary = payload.get("summary") or payload.get("message") or payload.get("details")
     url = payload.get("url") or payload.get("link") or payload.get("target")
 
-    lines = [f"{_status_emoji(payload.get('status') or payload.get('state'))}  *{title}*"]
+    lines = [f"{_lead_icons(payload)}  *{title}*"]
 
     context = []
     if repo:
@@ -334,7 +345,11 @@ def normalize_payload(payload: Dict[str, Any]) -> Dict[str, Any]:
 
     # The thread name and the turn duration are not in the payload; Codex keeps
     # both in its own state database.
-    thread = read_thread(str(payload.get("thread-id") or ""))
+    thread_id = str(payload.get("thread-id") or "")
+    if thread_id and not normalized.get("session_id"):
+        normalized["session_id"] = thread_id
+
+    thread = read_thread(thread_id)
     if thread.get("title") and not normalized.get("session_title"):
         normalized["session_title"] = thread["title"]
     if thread.get("branch") and not normalized.get("branch"):
@@ -344,9 +359,7 @@ def normalize_payload(payload: Dict[str, Any]) -> Dict[str, Any]:
 
     if not normalized.get("duration"):
         duration = format_duration_ms(
-            read_turn_duration_ms(
-                str(payload.get("thread-id") or ""), str(payload.get("turn-id") or "")
-            )
+            read_turn_duration_ms(thread_id, str(payload.get("turn-id") or ""))
         )
         if duration:
             normalized["duration"] = duration

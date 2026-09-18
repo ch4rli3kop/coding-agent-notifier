@@ -6,6 +6,7 @@ from pathlib import Path
 import pytest
 
 from coding_agent_notifier import codex_state, notifier
+from coding_agent_notifier.icons import icon_for
 from coding_agent_notifier.notifier import build_message, normalize_payload
 from coding_agent_notifier.transcript import format_duration_ms
 
@@ -121,7 +122,7 @@ def test_notify_payload_gains_thread_name_and_duration(codex_home: Path) -> None
     )
 
     lines = build_message(payload).splitlines()
-    assert lines[0] == "✅  *실험1*"
+    assert lines[0] == f"{icon_for(THREAD_ID)}  *실험1*"
     assert lines[1] == "`proj` · main · 1s · Codex"
     assert lines[2] == "\U0001f4ac 안녕"
     assert lines[3] == "↳ 안녕하세요! 무엇을 도와드릴까요?"
