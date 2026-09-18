@@ -329,13 +329,29 @@ def _parse_lark_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
     return parser.parse_args(argv)
 
 
+class EnvFileNotFound(NotificationError):
+    """Raised when an env file path does not exist."""
+
+
+def _strip_quotes(value: str) -> str:
+    """Drop one layer of matching surrounding quotes, like `set -a; . .env` does."""
+    if len(value) >= 2 and value[0] == value[-1] and value[0] in ("'", '"'):
+        return value[1:-1]
+    return value
+
+
 def _load_env_file(env_file: str) -> None:
     """Load simple KEY=VALUE pairs (optionally prefixed with 'export ') into os.environ."""
     env_path = Path(env_file)
     if not env_path.exists():
-        raise NotificationError(f".env file not found: {env_file}")
+        raise EnvFileNotFound(f".env file not found: {env_file}")
 
-    for line in env_path.read_text(encoding="utf-8").splitlines():
+    try:
+        content = env_path.read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError) as exc:
+        raise NotificationError(f"Could not read env file {env_file}: {exc}") from exc
+
+    for line in content.splitlines():
         stripped = line.strip()
         if not stripped or stripped.startswith("#"):
             continue
@@ -344,7 +360,7 @@ def _load_env_file(env_file: str) -> None:
         if "=" not in stripped:
             continue
         key, value = stripped.split("=", 1)
-        key, value = key.strip(), value.strip()
+        key, value = key.strip(), _strip_quotes(value.strip())
         if key and value and key not in os.environ:
             os.environ[key] = value
 
@@ -359,6 +375,11 @@ def _load_default_env_file(env_file: Optional[str]) -> bool:
 
     try:
         _load_env_file(env_file_to_load)
+    except EnvFileNotFound as exc:
+        # A missing env file is not fatal: credentials are usually supplied by
+        # the agent's own env config (hooks pass a default --env-file path that
+        # may simply not exist). Missing credentials are reported separately.
+        LOG.warning("Skipping env file %s: %s", env_file_to_load, exc)
     except NotificationError as exc:
         LOG.error("Failed to load env file %s: %s", env_file_to_load, exc)
         return False

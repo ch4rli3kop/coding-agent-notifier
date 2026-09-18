@@ -95,7 +95,7 @@ def test_agent_notify_wrapper_forwards_multiline_json_payload(tmp_path: Path) ->
     fake_python.write_text(
         """#!/usr/bin/env bash
 set -euo pipefail
-if [[ "${1:-}" == "-" ]]; then
+if [[ "${1:-}" == "-" || "${1:-}" == "-c" ]]; then
   exec "$REAL_PYTHON" "$@"
 fi
 if [[ "${1:-}" == */slack_notify.py ]]; then
@@ -118,6 +118,7 @@ exec "$REAL_PYTHON" "$@"
     env.update(
         {
             "PATH": f"{fake_bin}:{env.get('PATH', '')}",
+            "NOTIFIER_PYTHON": str(fake_python),
             "REAL_PYTHON": sys.executable,
             "FAKE_SLACK_PAYLOAD": str(captured_payload),
         }
@@ -419,3 +420,66 @@ def test_feishu_main_falls_back_to_feishu_webhook_env(
 
     assert exit_code == 0
     assert sent == ["https://example.test/feishu"]
+
+
+def test_env_file_loader_strips_surrounding_quotes(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Quoted values must behave like `set -a; . .env` and the OpenCode plugin."""
+    env_file = tmp_path / ".env"
+    env_file.write_text(
+        "SLACK_BOT_TOKEN=\"xoxb-quoted\"\nSLACK_USER_ID='U-quoted'\nLARK_WEBHOOK_URL=plain\n",
+        encoding="utf-8",
+    )
+    for key in ("SLACK_BOT_TOKEN", "SLACK_USER_ID", "LARK_WEBHOOK_URL"):
+        monkeypatch.delenv(key, raising=False)
+
+    notifier._load_env_file(str(env_file))
+
+    assert os.environ["SLACK_BOT_TOKEN"] == "xoxb-quoted"
+    assert os.environ["SLACK_USER_ID"] == "U-quoted"
+    assert os.environ["LARK_WEBHOOK_URL"] == "plain"
+
+
+def test_main_continues_when_env_file_is_missing(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Hooks pass a default --env-file path that often does not exist."""
+    monkeypatch.setenv("SLACK_BOT_TOKEN", "test-token")
+    monkeypatch.setenv("SLACK_USER_ID", "U999")
+
+    sent: list[tuple[str, str]] = []
+
+    def fake_send_dm(self: SlackNotifier, user_id: str, message: str) -> None:  # type: ignore[override]
+        sent.append((user_id, message))
+
+    monkeypatch.setattr(notifier.SlackNotifier, "send_dm", fake_send_dm)
+
+    exit_code = notifier.slack_main(
+        ["--env-file", str(tmp_path / "missing.env"), "--payload", '{"status":"ok"}']
+    )
+
+    assert exit_code == 0
+    assert sent and sent[0][0] == "U999"
+
+
+def test_main_still_fails_when_env_file_is_unreadable(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A path that exists but cannot be parsed is a real configuration error."""
+    env_file = tmp_path / "bad.env"
+    env_file.write_bytes(b"SLACK_BOT_TOKEN=\xff\xfe\n")
+    monkeypatch.delenv("SLACK_BOT_TOKEN", raising=False)
+
+    exit_code = notifier.slack_main(["--env-file", str(env_file), "--payload", "{}"])
+
+    assert exit_code == 1
+
+
+def test_detect_agent_label_from_claude_transcript() -> None:
+    payload = {
+        "hook_event_name": "Stop",
+        "transcript_path": "/home/user/.claude/projects/demo/transcript.jsonl",
+        "cwd": "/home/user/demo",
+    }
+    assert build_message(payload).startswith("Claude Code task completed")

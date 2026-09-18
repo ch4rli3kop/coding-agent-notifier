@@ -4,6 +4,11 @@ Most coding-agent CLIs now expose hooks or plugin points that can run shell comm
 
 ## General pattern
 - Ensure `SLACK_BOT_TOKEN` and `SLACK_USER_ID` are available to the hook command.
+- Ensure the wrapper can find a Python 3.12+ interpreter with this package installed. It checks
+  `$NOTIFIER_PYTHON`, then `<repo>/.venv/bin/python` and `<repo>/venv/bin/python`, then
+  `python3`/`python` on `PATH`. Set `NOTIFIER_PYTHON` when the environment lives outside the repo.
+- The wrapper only passes `--env-file` when the file exists (default `<repo>/.env`, override with
+  `ENV_FILE`), so credentials kept in the agent's own env config work with no repo `.env`.
 - For Feishu/Lark, ensure `LARK_WEBHOOK_URL` or `FEISHU_WEBHOOK_URL` is available to the hook command.
 - Simple setup: put those values in your user-level agent config, or put them in a user-level env file loaded with `--env-file`. Avoid project-level config files and repo `.env` for real tokens.
 - Prefer the agent's native hook system. Use the agent wrapper for Slack robustness across stdin/file/inline payloads:

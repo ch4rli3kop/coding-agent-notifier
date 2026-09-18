@@ -19,11 +19,21 @@ This guide walks through setup, configuration, usage, debugging, and development
 ```bash
 git clone git@github.com:Wangmerlyn/coding-agent-notifier.git
 cd coding-agent-notifier
-conda activate coding_agent_notifier  # or your preferred env
-pip install -e '.[dev]'
+
+# Recommended: a repo-local .venv, which the hook wrapper finds automatically.
+uv venv && uv pip install -e '.[dev]'
+# or, without uv:
+# python3 -m venv .venv && .venv/bin/pip install -e '.[dev]'
+# or conda: conda create -n coding_agent_notifier python=3.12 && conda activate coding_agent_notifier && pip install -e '.[dev]'
+
 # optional
 pre-commit install
 ```
+
+The hook wrapper does not inherit an activated environment, so it resolves the interpreter
+in this order: `$NOTIFIER_PYTHON`, then `<repo>/.venv/bin/python` and `<repo>/venv/bin/python`,
+then `python3`/`python` from `PATH`. If your environment lives elsewhere (conda, pyenv), set
+`NOTIFIER_PYTHON` to its absolute interpreter path in the agent's env config.
 
 The Python distribution/import names are `coding-agent-notifier` and `coding_agent_notifier`.
 

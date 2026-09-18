@@ -25,8 +25,13 @@ This project has been renamed from Vibe Coding Slack Notifier to Coding Agent No
 1. **Clone & env**
    - `git clone git@github.com:Wangmerlyn/coding-agent-notifier.git`
    - `cd coding-agent-notifier`
-   - `conda activate coding_agent_notifier` (or create it)
-   - `pip install -e '.[dev]'`
+   - Create a Python 3.12+ environment in the repo. Any of these works; a repo-local `.venv`
+     is recommended because hooks pick it up automatically:
+     ```bash
+     uv venv && uv pip install -e '.[dev]'      # uv (fastest)
+     python3 -m venv .venv && .venv/bin/pip install -e '.[dev]'   # stdlib venv
+     conda create -n coding_agent_notifier python=3.12 && conda activate coding_agent_notifier && pip install -e '.[dev]'
+     ```
    - Python distribution/import names: `coding-agent-notifier` / `coding_agent_notifier`.
    - Optional: `pre-commit install`
 
@@ -88,6 +93,20 @@ This project has been renamed from Vibe Coding Slack Notifier to Coding Agent No
    }
    ```
    Other agents can point their completion/stop/session-idle hook at the same wrapper. If a tool passes JSON on stdin, via a payload file, or as inline JSON, the wrapper normalizes it before sending Slack. If Codex says the hook needs review, open `/hooks` and approve the command.
+
+   **Interpreter resolution.** Hooks do not inherit the shell that activated your virtualenv, so the wrapper resolves Python itself, in this order:
+
+   1. `$NOTIFIER_PYTHON` (set it to an absolute interpreter path to be explicit)
+   2. `<repo>/.venv/bin/python`, then `<repo>/venv/bin/python`
+   3. `python3`, then `python` from `PATH`
+
+   With a repo-local `.venv` no extra configuration is needed. With conda or any other
+   location, set `NOTIFIER_PYTHON` in the agent's env config, e.g.
+   `"NOTIFIER_PYTHON": "/home/you/miniconda3/envs/coding_agent_notifier/bin/python"`.
+
+   **Env file.** The wrapper passes `--env-file <repo>/.env` only when that file exists, so the
+   recommended setup (credentials in the agent's own env config) works without a repo `.env`.
+   Override the path with `ENV_FILE=/path/to/your.env`.
 
 6. **Run tests (optional)**
    ```bash
